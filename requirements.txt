@@ -1,4 +1,10 @@
-# Core engine + mock demo: standard library only (no runtime deps).
-# Optional extras:
+# HTTP service
+fastapi>=0.110
+uvicorn>=0.29
+
+# Optional extras
 requests>=2.31      # only needed by LiveApiProvider (live mode)
 pytest>=8.0         # tests
+
+# Note: the core engines + CLI demo (railengine.demo) still need zero of these;
+# they are standard-library only. These deps are for the API/service layer.

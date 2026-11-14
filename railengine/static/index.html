@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>railengine</title>
+<style>
+  :root{--bg:#0f1420;--panel:#171e2e;--line:#273349;--fg:#e6edf6;--mut:#8aa0bd;
+        --ok:#2ec28a;--wl:#e0a64b;--acc:#5a8dee}
+  *{box-sizing:border-box}
+  body{margin:0;font:15px/1.5 ui-sans-serif,system-ui,Segoe UI,Roboto,sans-serif;
+       background:var(--bg);color:var(--fg)}
+  header{padding:20px 16px;border-bottom:1px solid var(--line)}
+  h1{margin:0;font-size:20px;letter-spacing:.3px}
+  .sub{color:var(--mut);font-size:13px;margin-top:4px}
+  main{max-width:860px;margin:0 auto;padding:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+        padding:16px;margin-bottom:16px}
+  label{display:block;font-size:12px;color:var(--mut);margin:0 0 4px}
+  input,select{width:100%;background:#0d1320;border:1px solid var(--line);color:var(--fg);
+        border-radius:7px;padding:8px 10px;font:inherit}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+  .classes{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .chip{display:inline-flex;align-items:center;gap:6px;background:#0d1320;
+        border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:13px;cursor:pointer}
+  .chip input{width:auto}
+  .btns{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+  button{background:var(--acc);border:0;color:#fff;border-radius:8px;padding:9px 16px;
+        font:inherit;font-weight:600;cursor:pointer}
+  button.ghost{background:transparent;border:1px solid var(--line);color:var(--fg)}
+  table{width:100%;border-collapse:collapse;margin-top:6px;font-size:14px}
+  th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}
+  th{color:var(--mut);font-weight:500;font-size:12px}
+  .pill{font-size:12px;padding:2px 8px;border-radius:999px;font-weight:600}
+  .pill.ok{background:rgba(46,194,138,.15);color:var(--ok)}
+  .pill.wl{background:rgba(224,166,75,.15);color:var(--wl)}
+  .best{color:var(--ok);font-weight:600}
+  .bar{height:6px;background:#0d1320;border-radius:4px;overflow:hidden;min-width:70px}
+  .bar>i{display:block;height:100%;background:var(--acc)}
+  h3{margin:18px 0 6px;font-size:15px}
+  .muted{color:var(--mut)}
+  .tag{font-size:11px;color:var(--mut);border:1px solid var(--line);border-radius:6px;padding:2px 7px}
+  .leg{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px dashed var(--line)}
+  .err{color:#ff8080}
+</style>
+</head>
+<body>
+<header>
+  <h1>railengine <span class="tag" id="mode">…</span></h1>
+  <div class="sub">next available seat · break my journey</div>
+</header>
+<main>
+  <div class="card">
+    <div class="grid">
+      <div><label>From</label><input id="from" value="JP"></div>
+      <div><label>To</label><input id="to" value="ASV"></div>
+      <div><label>Date</label><input id="date" type="date"></div>
+      <div><label>Train (for next-seat)</label><input id="train" value="19666"></div>
+    </div>
+    <div class="classes" id="classes"></div>
+    <div class="btns">
+      <button onclick="runNextSeat()">Next available seat</button>
+      <button class="ghost" onclick="runBreak()">Break my journey</button>
+    </div>
+    <div id="err" class="err"></div>
+  </div>
+  <div id="out"></div>
+</main>
+<script>
+const CLASSES=[["SL","Sleeper"],["3E","3E"],["3A","3A"],["2A","2A"],["1A","1A"]];
+const DEFAULT=new Set(["SL","3A","2A"]);
+const cbox=document.getElementById("classes");
+CLASSES.forEach(([c,l])=>{
+  const id="cls_"+c;
+  cbox.insertAdjacentHTML("beforeend",
+   `<label class="chip"><input type="checkbox" id="${id}" value="${c}" ${DEFAULT.has(c)?"checked":""}>${l}</label>`);
+});
+document.getElementById("date").value="2026-11-20";
+
+function sel(){return CLASSES.map(([c])=>c).filter(c=>document.getElementById("cls_"+c).checked).join(",");}
+function q(){return{from:val("from"),to:val("to"),date:val("date"),train:val("train"),classes:sel()};}
+function val(id){return document.getElementById(id).value.trim();}
+function setErr(m){document.getElementById("err").textContent=m||"";}
+function statusPill(s){const ok=s.state==="AVAILABLE"||s.state==="CURR_AVBL"||s.state==="RAC";
+  return `<span class="pill ${ok?'ok':'wl'}">${s.text}</span>`;}
+
+async function api(path){const r=await fetch(path);if(!r.ok){throw new Error((await r.json()).detail||r.status);}return r.json();}
+
+fetch("/api/health").then(r=>r.json()).then(h=>{document.getElementById("mode").textContent=h.provider+" provider";});
+
+async function runNextSeat(){
+  setErr("");const p=q();const out=document.getElementById("out");out.innerHTML="<div class='card muted'>querying…</div>";
+  try{
+    const d=await api(`/api/next-seat?train=${p.train}&date=${p.date}&from=${p.from}&to=${p.to}&classes=${p.classes}&full=true`);
+    let h=`<div class="card"><h3>Next available seat — ${d.from.name} → ${d.to.name} · train ${d.train}</h3>`;
+    for(const [cls,blk] of Object.entries(d.classes)){
+      h+=`<h3>${cls}</h3>`;
+      if(!blk.options.length){h+=`<div class="muted">not offered on this train</div>`;continue;}
+      const bestFrom=blk.best_confirmable?blk.best_confirmable.from.code:null;
+      h+=`<table><tr><th>Segment</th><th>Status</th><th>Coverage</th><th>Uncovered</th></tr>`;
+      for(const o of blk.options){
+        const isBest=o.confirmable&&o.from.code===bestFrom&&o.to.code===d.to.code;
+        const miss=[];if(o.uncovered_head_km)miss.push(`${d.from.name}→${o.from.name} (${o.uncovered_head_km}km)`);
+        if(o.uncovered_tail_km)miss.push(`${o.to.name}→${d.to.name} (${o.uncovered_tail_km}km)`);
+        h+=`<tr><td>${o.from.name} → ${o.to.name} ${isBest?'<span class="best">◆ best</span>':''}</td>
+             <td>${statusPill(o.status)}</td>
+             <td><div class="bar"><i style="width:${o.coverage_pct}%"></i></div><span class="muted">${o.coverage_pct}%</span></td>
+             <td class="muted">${miss.join("<br>")||"—"}</td></tr>`;
+      }
+      h+=`</table>`;
+      if(blk.best_confirmable&&blk.best_confirmable.uncovered_head_km)
+        h+=`<div class="muted" style="margin-top:6px">↳ head leg uncovered — use <b>Break my journey</b> to fill it.</div>`;
+    }
+    out.innerHTML=h+"</div>";
+  }catch(e){out.innerHTML="";setErr("next-seat: "+e.message);}
+}
+
+async function runBreak(){
+  setErr("");const p=q();const out=document.getElementById("out");out.innerHTML="<div class='card muted'>querying…</div>";
+  try{
+    const d=await api(`/api/break-journey?date=${p.date}&from=${p.from}&to=${p.to}&classes=${p.classes}`);
+    let h=`<div class="card"><h3>Break my journey — ${d.from.name} → ${d.to.name}</h3>`;
+    if(!d.journeys.length)h+=`<div class="muted">no confirmable broken itinerary found</div>`;
+    d.journeys.slice(0,4).forEach(j=>{
+      h+=`<div class="card" style="background:#0d1320">
+            <div><b>${j.legs.map(l=>l.train_no).join(" + ")}</b>
+            <span class="tag">${j.breaks} break</span>
+            <span class="tag">wait ${j.total_wait_min} min</span>
+            <span class="tag">arrive ${j.arrive}</span></div>`;
+      j.legs.forEach(l=>{h+=`<div class="leg"><span>${l.train_no} ${l.train_name}</span>
+            <span class="muted">${l.from.name} ${l.dep} → ${l.to.name} ${l.arr}</span>
+            <span>${l.class} ${statusPill({state:'AVAILABLE',text:l.status})}</span></div>`;});
+      h+=`<div class="muted" style="margin-top:6px">break at ${j.transfer.name}, ${j.total_wait_min} min connection</div></div>`;
+    });
+    out.innerHTML=h+"</div>";
+  }catch(e){out.innerHTML="";setErr("break-journey: "+e.message);}
+}
+</script>
+</body>
+</html>
