@@ -1,0 +1,4 @@
+# Core engine + mock demo: standard library only (no runtime deps).
+# Optional extras:
+requests>=2.31      # only needed by LiveApiProvider (live mode)
+pytest>=8.0         # tests
