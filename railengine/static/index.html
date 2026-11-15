@@ -52,10 +52,10 @@
 <main>
   <div class="card">
     <div class="grid">
-      <div><label>From</label><input id="from" value="JP"></div>
-      <div><label>To</label><input id="to" value="ASV"></div>
+      <div><label>From</label><input id="from" value="NDLS"></div>
+      <div><label>To</label><input id="to" value="MMCT"></div>
       <div><label>Date</label><input id="date" type="date"></div>
-      <div><label>Train (for next-seat)</label><input id="train" value="19666"></div>
+      <div><label>Train (for next-seat)</label><input id="train" value="12952"></div>
     </div>
     <div class="classes" id="classes"></div>
     <div class="btns">
@@ -68,14 +68,14 @@
 </main>
 <script>
 const CLASSES=[["SL","Sleeper"],["3E","3E"],["3A","3A"],["2A","2A"],["1A","1A"]];
-const DEFAULT=new Set(["SL","3A","2A"]);
+const DEFAULT=new Set(["3A","2A"]);
 const cbox=document.getElementById("classes");
 CLASSES.forEach(([c,l])=>{
   const id="cls_"+c;
   cbox.insertAdjacentHTML("beforeend",
    `<label class="chip"><input type="checkbox" id="${id}" value="${c}" ${DEFAULT.has(c)?"checked":""}>${l}</label>`);
 });
-document.getElementById("date").value="2026-11-20";
+document.getElementById("date").value="2026-11-29";
 
 function sel(){return CLASSES.map(([c])=>c).filter(c=>document.getElementById("cls_"+c).checked).join(",");}
 function q(){return{from:val("from"),to:val("to"),date:val("date"),train:val("train"),classes:sel()};}
@@ -120,7 +120,7 @@ async function runBreak(){
   try{
     const d=await api(`/api/break-journey?date=${p.date}&from=${p.from}&to=${p.to}&classes=${p.classes}`);
     let h=`<div class="card"><h3>Break my journey — ${d.from.name} → ${d.to.name}</h3>`;
-    if(!d.journeys.length)h+=`<div class="muted">no confirmable broken itinerary found</div>`;
+    if(!d.journeys.length)h+=`<div class="muted">${d.note||"no confirmable broken itinerary found"}</div>`;
     d.journeys.slice(0,4).forEach(j=>{
       h+=`<div class="card" style="background:#0d1320">
             <div><b>${j.legs.map(l=>l.train_no).join(" + ")}</b>

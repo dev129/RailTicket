@@ -24,7 +24,7 @@ from .journey import BrokenJourney, find_broken_journeys
 from .models import SegmentOption, TravelClass
 from .next_seat import find_next_available
 from .providers.base import AvailabilityProvider
-from .providers.live import LiveApiProvider
+from .providers.irctcdev import IrctcDevProvider
 from .providers.mock import STATIONS, MockProvider
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -32,22 +32,30 @@ STATIC_DIR = Path(__file__).parent / "static"
 
 # --------------------------------------------------------------------------- #
 # Provider wiring
+#   default  -> live irctc.dev (real IR PRS data)
+#   USE_MOCK -> offline demo corridor
 # --------------------------------------------------------------------------- #
 @lru_cache(maxsize=1)
 def get_provider() -> AvailabilityProvider:
-    if os.environ.get("RAIL_API_BASE") and os.environ.get("RAIL_API_KEY"):
-        return LiveApiProvider(schedule_source=MockProvider())
-    return MockProvider()
+    if os.environ.get("USE_MOCK"):
+        return MockProvider()
+    return IrctcDevProvider()
 
 
 def provider_mode() -> str:
-    return "live" if isinstance(get_provider(), LiveApiProvider) else "mock"
+    return "mock" if isinstance(get_provider(), MockProvider) else "live (irctc.dev)"
 
 
 # --------------------------------------------------------------------------- #
 # Serialization
 # --------------------------------------------------------------------------- #
 def _name(code: str) -> str:
+    p = get_provider()
+    namer = getattr(p, "station_name", None)
+    if namer:
+        n = namer(code)
+        if n and n != code:
+            return n
     return STATIONS[code].name if code in STATIONS else code
 
 
@@ -176,8 +184,13 @@ def break_journey(
         provider, _parse_date(date), from_.upper(), to.upper(),
         _parse_classes(classes), min_connection_min=min_connection_min,
     )
+    note = None
+    if not journeys and not isinstance(provider, MockProvider):
+        note = ("Break-journey needs multi-train discovery (which trains run each leg). "
+                "That live layer is not wired yet, so no itineraries are returned in live "
+                "mode. Set USE_MOCK=1 to see break-journey on the demo corridor.")
     return {"from": _station(from_.upper()), "to": _station(to.upper()),
-            "provider": provider_mode(),
+            "provider": provider_mode(), "note": note,
             "journeys": [_journey_json(j) for j in journeys]}
 
 
