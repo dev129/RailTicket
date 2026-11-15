@@ -18,7 +18,9 @@ irctc.dev is queried per train number.
 from __future__ import annotations
 
 import os
+import time
 from functools import lru_cache
+from threading import Lock
 
 from ..availability import parse_status
 from ..models import (
@@ -39,17 +41,57 @@ _ALL_CLASSES = (
 class IrctcDevProvider(AvailabilityProvider):
     BASE = "https://api.irctc.dev"
 
-    def __init__(self, quota: str = "GN", timeout: float = 45.0,
+    def __init__(self, quota: str = "GN", timeout: float = 20.0,
                  discovery: AvailabilityProvider | None = None) -> None:
         self.quota = quota
         self.timeout = timeout
         self._discovery = discovery
         self._train_cache: dict[str, Train] = {}
+        self._avail_cache: dict[tuple, AvailabilityStatus] = {}
+        self._search_cache: dict[tuple, list] = {}
         self._names: dict[str, str] = {}
         self._calls = 0
 
     def station_name(self, code: str) -> str:
         return self._names.get(code, code)
+
+    def search_trains(self, origin: str, dest: str, travel_date) -> list[dict]:
+        """Trains running origin->dest on a date, with boarding/alighting timing.
+
+        Returns light dicts: number, name, dep/arr ("HH:MM"), dep_day/arr_day
+        (day offsets), dist. Used to discover break-journey legs.
+        """
+        key = (origin, dest, travel_date.isoformat())
+        if key in self._search_cache:
+            return self._search_cache[key]
+        try:
+            resp = self._get(
+                f"{self.BASE}/api/v1/trains/search",
+                params={"from": origin, "to": dest, "date": travel_date.isoformat()},
+            )
+        except Exception:
+            self._search_cache[key] = []
+            return []
+        out: list[dict] = []
+        if resp.status_code == 200:
+            body = resp.json()
+            if body.get("success"):
+                for t in body.get("data") or []:
+                    if t.get("fromStationName"):
+                        self._names[t["fromStation"]] = t["fromStationName"].title()
+                    if t.get("toStationName"):
+                        self._names[t["toStation"]] = t["toStationName"].title()
+                    out.append({
+                        "number": str(t["trainNo"]),
+                        "name": t.get("trainName", ""),
+                        "dep": t.get("departure"),
+                        "arr": t.get("arrival"),
+                        "dep_day": int(t.get("fromStationDayOffset") or 0),
+                        "arr_day": int(t.get("toStationDayOffset") or 0),
+                        "dist": t.get("distance"),
+                    })
+        self._search_cache[key] = out
+        return out
 
     # --- auth -------------------------------------------------------------- #
     def _headers(self) -> dict:
@@ -58,7 +100,18 @@ class IrctcDevProvider(AvailabilityProvider):
 
     def _get(self, url: str, params: dict | None = None):
         import requests  # lazy: stdlib-only paths need nothing
-        return requests.get(url, headers=self._headers(), params=params, timeout=self.timeout)
+        resp = None
+        for attempt in range(3):
+            resp = requests.get(url, headers=self._headers(), params=params, timeout=self.timeout)
+            if resp.status_code not in (429, 500, 502, 503, 504):
+                return resp
+            try:
+                wait = float(resp.headers.get("Retry-After", ""))
+            except ValueError:
+                wait = 0.0
+            wait = min(max(wait, 0.6 * (2 ** attempt)), 8.0)
+            time.sleep(wait)
+        return resp
 
     # --- static ------------------------------------------------------------ #
     def get_train(self, train_no: str) -> Train:
@@ -113,6 +166,15 @@ class IrctcDevProvider(AvailabilityProvider):
 
     # --- dynamic ----------------------------------------------------------- #
     def get_availability(self, query: SegmentQuery) -> AvailabilityStatus:
+        ckey = (query.train_no, query.from_code, query.to_code,
+                query.travel_class.value, query.travel_date.isoformat())
+        if ckey in self._avail_cache:
+            return self._avail_cache[ckey]
+        result = self._fetch_availability(query)
+        self._avail_cache[ckey] = result
+        return result
+
+    def _fetch_availability(self, query: SegmentQuery) -> AvailabilityStatus:
         self._calls += 1
         want = query.travel_date.isoformat()
         resp = self._get(

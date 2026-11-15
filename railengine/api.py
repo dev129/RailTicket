@@ -21,6 +21,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .journey import BrokenJourney, find_broken_journeys
+from .journey_live import find_broken_journeys_live
 from .models import SegmentOption, TravelClass
 from .next_seat import find_next_available
 from .providers.base import AvailabilityProvider
@@ -180,16 +181,24 @@ def break_journey(
     min_connection_min: int = Query(60, ge=0),
 ) -> dict:
     provider = get_provider()
-    journeys = find_broken_journeys(
-        provider, _parse_date(date), from_.upper(), to.upper(),
-        _parse_classes(classes), min_connection_min=min_connection_min,
-    )
+    o, d = from_.upper(), to.upper()
+    cls = _parse_classes(classes)
+    tdate = _parse_date(date)
+
+    if isinstance(provider, MockProvider):
+        journeys = find_broken_journeys(provider, tdate, o, d, cls,
+                                        min_connection_min=min_connection_min)
+    else:
+        journeys = find_broken_journeys_live(provider, tdate, o, d, cls,
+                                             min_connection_min=min_connection_min)
+
     note = None
     if not journeys and not isinstance(provider, MockProvider):
-        note = ("Break-journey needs multi-train discovery (which trains run each leg). "
-                "That live layer is not wired yet, so no itineraries are returned in live "
-                "mode. Set USE_MOCK=1 to see break-journey on the demo corridor.")
-    return {"from": _station(from_.upper()), "to": _station(to.upper()),
+        note = ("No confirmed two-train break found. Either every candidate leg was "
+                "waitlisted on this date (common on saturated routes to big cities), or "
+                "the free irctc.dev tier rate-limited this multi-call search — wait a "
+                "minute and try again, pick a less-booked date, or add more classes.")
+    return {"from": _station(o), "to": _station(d),
             "provider": provider_mode(), "note": note,
             "journeys": [_journey_json(j) for j in journeys]}
 
