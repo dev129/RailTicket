@@ -1,0 +1,15 @@
+# Render blueprint — one dashboard deploy, no CLI.
+# Render builds the Dockerfile, gives a public HTTPS URL, and redeploys on push.
+# You set IRCTC_DEV_KEY once in the dashboard (it's marked sync:false below).
+services:
+  - type: web
+    name: railengine
+    runtime: docker
+    plan: free
+    branch: claude/railway-booking-journey-zy3hom
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: IRCTC_DEV_KEY
+        sync: false          # you paste your irctc.dev key here in the Render dashboard

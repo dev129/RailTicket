@@ -3,6 +3,21 @@
 The service is a single ASGI app: `railengine.api:app` (FastAPI), serving a
 JSON API + a static UI at `/`.
 
+## Deploy on Render (recommended — dashboard only, no CLI)
+
+The repo has a `render.yaml` blueprint, so this is almost entirely clicks.
+
+1. Go to **render.com** → sign up (use **Sign in with GitHub**).
+2. **New +** → **Blueprint** → connect this repo (`dev129/RailTicket`).
+   Render reads `render.yaml` and creates the `railengine` web service.
+3. When prompted for the **`IRCTC_DEV_KEY`** environment variable, paste your
+   irctc.dev API key → **Apply**.
+4. Render builds the Docker image and gives a public HTTPS URL
+   (`https://railengine-xxxx.onrender.com`). That's the live site.
+
+Every push to the branch auto-redeploys. Free plan sleeps after inactivity
+(first hit after idle takes ~30s to wake) — fine for a demo.
+
 ## Run locally
 
 ```bash
