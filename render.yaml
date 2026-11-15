@@ -6,7 +6,7 @@ services:
     name: railengine
     runtime: docker
     plan: free
-    branch: claude/railway-booking-journey-zy3hom
+    branch: main
     dockerfilePath: ./Dockerfile
     healthCheckPath: /api/health
     autoDeploy: true
