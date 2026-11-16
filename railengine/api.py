@@ -22,7 +22,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .journey import BrokenJourney, find_broken_journeys
 from .journey_live import find_broken_journeys_live
-from .models import SegmentOption, TravelClass
+from .models import SegmentOption, SegmentQuery, TravelClass
 from .next_seat import find_next_available
 from .providers.base import AvailabilityProvider
 from .providers.irctcdev import IrctcDevProvider
@@ -201,6 +201,51 @@ def break_journey(
     return {"from": _station(o), "to": _station(d),
             "provider": provider_mode(), "note": note,
             "journeys": [_journey_json(j) for j in journeys]}
+
+
+def _route_trains(provider, origin, dest, tdate, max_trains):
+    """Normalized list of trains serving origin->dest, for live or mock."""
+    searcher = getattr(provider, "search_trains", None)
+    if searcher:
+        rows = searcher(origin, dest, tdate)[:max_trains]
+        return [{"number": r["number"], "name": r["name"],
+                 "dep": r.get("dep"), "arr": r.get("arr")} for r in rows]
+    out = []
+    for t in provider.trains_serving(origin, dest)[:max_trains]:
+        bs, as_ = t.stops[t.seq_of(origin)], t.stops[t.seq_of(dest)]
+        out.append({"number": t.number, "name": t.name, "dep": bs.dep, "arr": as_.arr})
+    return out
+
+
+@app.get("/api/trip")
+def trip(
+    date: str = Query(..., description="YYYY-MM-DD"),
+    from_: str = Query(..., alias="from"),
+    to: str = Query(...),
+    classes: str = Query("3A,2A"),
+    max_trains: int = Query(6, ge=1, le=12),
+) -> dict:
+    """Trains running from->to on a date, each with per-class availability.
+
+    This is the passenger-facing entry point: no train number required.
+    """
+    provider = get_provider()
+    o, d = from_.upper(), to.upper()
+    tdate = _parse_date(date)
+    cls = _parse_classes(classes)
+
+    trains = _route_trains(provider, o, d, tdate, max_trains)
+    out = []
+    for t in trains:
+        per_class = {}
+        for c in cls:
+            st = provider.get_availability(SegmentQuery(t["number"], tdate, o, d, c))
+            per_class[c.value] = {"state": st.state.value, "number": st.number,
+                                  "text": str(st), "confirmable": st.confirmable}
+        out.append({"train_no": t["number"], "name": t["name"],
+                    "dep": t.get("dep"), "arr": t.get("arr"), "classes": per_class})
+    return {"from": _station(o), "to": _station(d), "date": date,
+            "provider": provider_mode(), "trains": out}
 
 
 @app.get("/")

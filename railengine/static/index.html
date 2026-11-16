@@ -3,137 +3,210 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>railengine</title>
+<title>Break &amp; Board</title>
 <style>
-  :root{--bg:#0f1420;--panel:#171e2e;--line:#273349;--fg:#e6edf6;--mut:#8aa0bd;
-        --ok:#2ec28a;--wl:#e0a64b;--acc:#5a8dee}
+  :root{
+    --bg:#f5f7fb; --surface:#ffffff; --surface2:#eef2f9;
+    --fg:#16203a; --mut:#5c6b86; --line:#e1e7f1;
+    --accent:#2f54eb; --accent-weak:#e7ecfd;
+    --ok:#17916a; --ok-weak:#e1f3ec;
+    --wl:#b9770b; --wl-weak:#f8eedb;
+    --rac:#2f6feb; --rac-weak:#e6eefb;
+  }
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    --bg:#0d1322; --surface:#151d30; --surface2:#1b2438;
+    --fg:#e7edf8; --mut:#93a4c2; --line:#273246;
+    --accent:#6a93f0; --accent-weak:#1c2744;
+    --ok:#36c48c; --ok-weak:#14301f;
+    --wl:#e3ab51; --wl-weak:#30260f;
+    --rac:#6a93f0; --rac-weak:#172138;
+    color-scheme:dark;
+  }}
   *{box-sizing:border-box}
-  body{margin:0;font:15px/1.5 ui-sans-serif,system-ui,Segoe UI,Roboto,sans-serif;
-       background:var(--bg);color:var(--fg)}
-  header{padding:20px 16px;border-bottom:1px solid var(--line)}
-  h1{margin:0;font-size:20px;letter-spacing:.3px}
-  .sub{color:var(--mut);font-size:13px;margin-top:4px}
-  main{max-width:860px;margin:0 auto;padding:16px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;
-        padding:16px;margin-bottom:16px}
-  label{display:block;font-size:12px;color:var(--mut);margin:0 0 4px}
-  input,select{width:100%;background:#0d1320;border:1px solid var(--line);color:var(--fg);
-        border-radius:7px;padding:8px 10px;font:inherit}
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
-  .classes{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
-  .chip{display:inline-flex;align-items:center;gap:6px;background:#0d1320;
-        border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:13px;cursor:pointer}
-  .chip input{width:auto}
-  .btns{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
-  button{background:var(--acc);border:0;color:#fff;border-radius:8px;padding:9px 16px;
-        font:inherit;font-weight:600;cursor:pointer}
-  button.ghost{background:transparent;border:1px solid var(--line);color:var(--fg)}
-  table{width:100%;border-collapse:collapse;margin-top:6px;font-size:14px}
-  th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}
-  th{color:var(--mut);font-weight:500;font-size:12px}
-  .pill{font-size:12px;padding:2px 8px;border-radius:999px;font-weight:600}
-  .pill.ok{background:rgba(46,194,138,.15);color:var(--ok)}
-  .pill.wl{background:rgba(224,166,75,.15);color:var(--wl)}
-  .best{color:var(--ok);font-weight:600}
-  .bar{height:6px;background:#0d1320;border-radius:4px;overflow:hidden;min-width:70px}
-  .bar>i{display:block;height:100%;background:var(--acc)}
-  h3{margin:18px 0 6px;font-size:15px}
+  body{background:var(--bg);color:var(--fg);margin:0;
+       font:15px/1.5 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  .wrap{max-width:820px;margin:0 auto;padding:22px 16px 40px}
+  h1{font-size:24px;margin:0;letter-spacing:.2px}
+  .tagline{color:var(--mut);font-size:14px;margin-top:3px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:16px}
+  .fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .fields .wide{grid-column:1 / -1}
+  label{display:block;font-size:11.5px;letter-spacing:.4px;text-transform:uppercase;color:var(--mut);margin:0 0 5px}
+  input,select{width:100%;background:var(--bg);color:var(--fg);border:1px solid var(--line);
+        border-radius:9px;padding:10px;font:inherit;min-width:0}
+  input:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
+  .hint{font-size:12px;color:var(--mut);margin-top:4px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:7px}
+  .chip{display:inline-flex;align-items:center;gap:7px;cursor:pointer;background:var(--bg);
+        border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13.5px;user-select:none}
+  .chip input{width:auto;accent-color:var(--accent)}
+  .chip.on{border-color:var(--accent);background:var(--accent-weak);color:var(--accent)}
+  .actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+  button.go{flex:1 1 170px;font-weight:600;font-size:15px;cursor:pointer;border:1px solid var(--accent);
+        background:var(--accent);color:#fff;border-radius:11px;padding:12px}
+  button.ghost{background:transparent;color:var(--fg);border-color:var(--line)}
+  h2{font-size:18px;margin:2px 0}
+  .sub{color:var(--mut);font-size:13.5px;margin:2px 0 10px}
+  .train{border:1px solid var(--line);border-radius:12px;padding:13px 14px;margin-top:10px;background:var(--surface)}
+  .trow{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline}
+  .tname{font-weight:600}
+  .tno{color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums}
+  .ttime{color:var(--mut);font-size:13px;font-variant-numeric:tabular-nums}
+  .pills{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .pill{font-size:13px;font-weight:600;padding:5px 11px;border-radius:999px;font-variant-numeric:tabular-nums;
+        display:inline-flex;align-items:center;gap:8px}
+  .pill.ok{background:var(--ok-weak);color:var(--ok)}
+  .pill.wl{background:var(--wl-weak);color:var(--wl)}
+  .pill.rac{background:var(--rac-weak);color:var(--rac)}
+  .pill .cls{opacity:.7;font-weight:500}
+  .findbtn{border:0;background:transparent;color:inherit;font:inherit;font-weight:700;cursor:pointer;
+        text-decoration:underline;padding:0}
+  .drill{margin-top:9px;padding:10px 12px;background:var(--surface2);border-radius:9px;font-size:13.5px}
+  .drill .good{color:var(--ok);font-weight:600}
+  .drill .muted{color:var(--mut)}
+  .jrny{border:1px solid var(--line);border-radius:12px;margin-top:12px;overflow:hidden}
+  .jhead{display:flex;gap:9px;align-items:center;flex-wrap:wrap;padding:12px 14px;background:var(--surface2);border-bottom:1px solid var(--line)}
+  .jhead b{font-size:16px}
+  .tag{font-size:12px;color:var(--mut);border:1px solid var(--line);background:var(--surface);border-radius:7px;padding:3px 9px}
+  .leg{display:flex;gap:12px;padding:11px 14px}
+  .leg+.leg{border-top:1px dashed var(--line)}
+  .legno{color:var(--accent);font-weight:600;min-width:62px;font-variant-numeric:tabular-nums}
+  .legb{flex:1;min-width:0}
+  .legname{color:var(--mut);font-size:13px}
+  .legt{font-variant-numeric:tabular-nums;margin-top:2px}
+  .brk{padding:9px 14px;font-size:12.5px;color:var(--wl);background:var(--wl-weak);font-weight:500}
   .muted{color:var(--mut)}
-  .tag{font-size:11px;color:var(--mut);border:1px solid var(--line);border-radius:6px;padding:2px 7px}
-  .leg{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px dashed var(--line)}
-  .err{color:#ff8080}
+  .empty{color:var(--mut);padding:12px 2px}
+  .spin{color:var(--mut);padding:12px 2px}
+  .modeline{font-size:12px;color:var(--mut);margin-top:3px}
+  footer{color:var(--mut);font-size:12px;margin-top:26px;text-align:center}
 </style>
 </head>
 <body>
-<header>
-  <h1>railengine <span class="tag" id="mode">…</span></h1>
-  <div class="sub">next available seat · break my journey</div>
-</header>
-<main>
+<div class="wrap">
+  <header>
+    <h1>Break &amp; Board</h1>
+    <div class="tagline">Enter your date and stations. See which trains have seats — and when they don't, find a confirmed seat by boarding later or breaking the trip.</div>
+    <div class="modeline" id="modeline">connecting…</div>
+  </header>
+
   <div class="card">
-    <div class="grid">
-      <div><label>From</label><input id="from" value="NDLS"></div>
-      <div><label>To</label><input id="to" value="MMCT"></div>
-      <div><label>Date</label><input id="date" type="date"></div>
-      <div><label>Train (for next-seat)</label><input id="train" value="12952"></div>
+    <div class="fields">
+      <div><label for="from">From (station code)</label>
+        <input id="from" list="stns" value="NDLS" autocomplete="off"></div>
+      <div><label for="to">To (station code)</label>
+        <input id="to" list="stns" value="MMCT" autocomplete="off"></div>
+      <div class="wide"><label for="date">Date of travel</label>
+        <input id="date" type="date"></div>
     </div>
-    <div class="classes" id="classes"></div>
-    <div class="btns">
-      <button onclick="runNextSeat()">Next available seat</button>
-      <button class="ghost" onclick="runBreak()">Break my journey</button>
+    <datalist id="stns">
+      <option value="NDLS">New Delhi</option><option value="MMCT">Mumbai Central</option>
+      <option value="BCT">Mumbai Central (BCT)</option><option value="JP">Jaipur</option>
+      <option value="ASV">Asarva</option><option value="UDZ">Udaipur City</option>
+      <option value="AII">Ajmer</option><option value="KOTA">Kota</option>
+      <option value="BRC">Vadodara</option><option value="ST">Surat</option>
+      <option value="HWH">Howrah</option><option value="MAS">Chennai</option>
+      <option value="SBC">Bengaluru</option><option value="PNBE">Patna</option>
+    </datalist>
+    <div class="hint">Tip: use IRCTC station codes (type to search the list). Date must be within the ~60-day booking window.</div>
+    <div style="margin-top:14px"><label>Classes</label><div class="chips" id="chips"></div></div>
+    <div class="actions">
+      <button class="go" onclick="findSeats()">Find seats</button>
+      <button class="go ghost" onclick="runBreak()">Break my journey</button>
     </div>
-    <div id="err" class="err"></div>
   </div>
+
   <div id="out"></div>
-</main>
+  <footer>Live availability via irctc.dev (real IR reservation data). Not a booking site.</footer>
+</div>
+
 <script>
-const CLASSES=[["SL","Sleeper"],["3E","3E"],["3A","3A"],["2A","2A"],["1A","1A"]];
+const CLASSES=[["SL","Sleeper"],["3E","3E Economy"],["3A","AC 3-Tier"],["2A","AC 2-Tier"],["1A","AC First"]];
 const DEFAULT=new Set(["3A","2A"]);
-const cbox=document.getElementById("classes");
-CLASSES.forEach(([c,l])=>{
-  const id="cls_"+c;
-  cbox.insertAdjacentHTML("beforeend",
-   `<label class="chip"><input type="checkbox" id="${id}" value="${c}" ${DEFAULT.has(c)?"checked":""}>${l}</label>`);
-});
-document.getElementById("date").value="2026-11-29";
+const CLABEL=Object.fromEntries(CLASSES.map(([c,l])=>[c,l]));
+let selected=new Set(DEFAULT);
 
-function sel(){return CLASSES.map(([c])=>c).filter(c=>document.getElementById("cls_"+c).checked).join(",");}
-function q(){return{from:val("from"),to:val("to"),date:val("date"),train:val("train"),classes:sel()};}
-function val(id){return document.getElementById(id).value.trim();}
-function setErr(m){document.getElementById("err").textContent=m||"";}
-function statusPill(s){const ok=s.state==="AVAILABLE"||s.state==="CURR_AVBL"||s.state==="RAC";
-  return `<span class="pill ${ok?'ok':'wl'}">${s.text}</span>`;}
+const $=s=>document.querySelector(s);
+const val=id=>$("#"+id).value.trim().toUpperCase();
+const sel=()=>CLASSES.map(([c])=>c).filter(c=>selected.has(c));
 
-async function api(path){const r=await fetch(path);if(!r.ok){throw new Error((await r.json()).detail||r.status);}return r.json();}
+function pillClass(state){return state==="WAITLIST"?"wl":(state==="RAC"?"rac":(state==="AVAILABLE"||state==="CURR_AVBL"?"ok":"wl"));}
 
-fetch("/api/health").then(r=>r.json()).then(h=>{document.getElementById("mode").textContent=h.provider+" provider";});
+(function init(){
+  $("#date").value="2026-11-29";
+  const box=$("#chips");
+  box.innerHTML=CLASSES.map(([c,l])=>`<label class="chip ${selected.has(c)?'on':''}"><input type="checkbox" value="${c}" ${selected.has(c)?'checked':''}>${c} · ${l}</label>`).join("");
+  box.querySelectorAll("input").forEach(cb=>cb.addEventListener("change",()=>{
+    cb.checked?selected.add(cb.value):selected.delete(cb.value);
+    if(!selected.size){selected.add(cb.value);cb.checked=true;}
+    cb.closest(".chip").classList.toggle("on",cb.checked);
+  }));
+  fetch("/api/health").then(r=>r.json()).then(h=>{$("#modeline").textContent="data source: "+h.provider;})
+    .catch(()=>{$("#modeline").textContent="";});
+})();
 
-async function runNextSeat(){
-  setErr("");const p=q();const out=document.getElementById("out");out.innerHTML="<div class='card muted'>querying…</div>";
+async function getJSON(u){const r=await fetch(u);const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.detail||("HTTP "+r.status));return d;}
+function q(){return{from:val("from"),to:val("to"),date:$("#date").value,classes:sel().join(",")};}
+
+async function findSeats(){
+  const p=q();const out=$("#out");
+  if(!p.from||!p.to||!p.date){out.innerHTML=`<div class="card empty">Enter From, To and Date.</div>`;return;}
+  out.innerHTML=`<div class="card spin">Finding trains ${p.from} → ${p.to} on ${p.date}…</div>`;
   try{
-    const d=await api(`/api/next-seat?train=${p.train}&date=${p.date}&from=${p.from}&to=${p.to}&classes=${p.classes}&full=true`);
-    let h=`<div class="card"><h3>Next available seat — ${d.from.name} → ${d.to.name} · train ${d.train}</h3>`;
-    for(const [cls,blk] of Object.entries(d.classes)){
-      h+=`<h3>${cls}</h3>`;
-      if(!blk.options.length){h+=`<div class="muted">not offered on this train</div>`;continue;}
-      const bestFrom=blk.best_confirmable?blk.best_confirmable.from.code:null;
-      h+=`<table><tr><th>Segment</th><th>Status</th><th>Coverage</th><th>Uncovered</th></tr>`;
-      for(const o of blk.options){
-        const isBest=o.confirmable&&o.from.code===bestFrom&&o.to.code===d.to.code;
-        const miss=[];if(o.uncovered_head_km)miss.push(`${d.from.name}→${o.from.name} (${o.uncovered_head_km}km)`);
-        if(o.uncovered_tail_km)miss.push(`${o.to.name}→${d.to.name} (${o.uncovered_tail_km}km)`);
-        h+=`<tr><td>${o.from.name} → ${o.to.name} ${isBest?'<span class="best">◆ best</span>':''}</td>
-             <td>${statusPill(o.status)}</td>
-             <td><div class="bar"><i style="width:${o.coverage_pct}%"></i></div><span class="muted">${o.coverage_pct}%</span></td>
-             <td class="muted">${miss.join("<br>")||"—"}</td></tr>`;
+    const d=await getJSON(`/api/trip?from=${p.from}&to=${p.to}&date=${p.date}&classes=${p.classes}`);
+    if(!d.trains.length){out.innerHTML=`<div class="card empty">No direct trains found for ${d.from.name} → ${d.to.name} on this date. Check the station codes and date.</div>`;return;}
+    let h=`<div class="card"><h2>${d.from.name} → ${d.to.name}</h2><div class="sub">${d.date} · ${d.trains.length} train(s) · tap a waitlisted class to find a confirmed seat</div>`;
+    d.trains.forEach((t,i)=>{
+      h+=`<div class="train"><div class="trow"><div><span class="tno">${t.train_no}</span> <span class="tname">${t.name}</span></div><div class="ttime">dep ${t.dep||"—"} · arr ${t.arr||"—"}</div></div><div class="pills">`;
+      for(const[c,v]of Object.entries(t.classes)){
+        const pc=pillClass(v.state);
+        if(v.confirmable){
+          h+=`<span class="pill ${pc}"><span class="cls">${c}</span> ${v.text}</span>`;
+        }else{
+          h+=`<span class="pill ${pc}"><span class="cls">${c}</span> ${v.text} · <button class="findbtn" onclick="drill('${t.train_no}','${p.from}','${p.to}','${p.date}','${c}',this)">find seat</button></span>`;
+        }
       }
-      h+=`</table>`;
-      if(blk.best_confirmable&&blk.best_confirmable.uncovered_head_km)
-        h+=`<div class="muted" style="margin-top:6px">↳ head leg uncovered — use <b>Break my journey</b> to fill it.</div>`;
+      h+=`</div><div id="drill-${t.train_no}-${c_safe()}"></div></div>`;
+    });
+    out.innerHTML=h+`</div>`;
+  }catch(e){out.innerHTML=`<div class="card empty">Error: ${e.message}</div>`;}
+}
+function c_safe(){return Math.random().toString(36).slice(2,7);}
+
+async function drill(train,from,to,date,cls,btn){
+  const host=btn.closest(".train").querySelector('[id^="drill-"]');
+  host.innerHTML=`<div class="drill muted">checking sub-segments…</div>`;
+  try{
+    const d=await getJSON(`/api/next-seat?train=${train}&from=${from}&to=${to}&date=${date}&classes=${cls}&full=false`);
+    const blk=d.classes[cls];
+    const best=blk&&blk.best_confirmable;
+    if(best){
+      const head=best.uncovered_head_km, tail=best.uncovered_tail_km;
+      let miss=[];
+      if(head)miss.push(`you'd board at <b>${best.from.name}</b> (${d.from.name}→${best.from.name}, ${head} km, not on this ticket)`);
+      if(tail)miss.push(`you'd get off at <b>${best.to.name}</b> (${best.to.name}→${d.to.name}, ${tail} km, not on this ticket)`);
+      host.innerHTML=`<div class="drill"><span class="good">✓ Confirmed seat found</span> on ${cls}: <b>${best.from.name} → ${best.to.name}</b> — ${best.status.text}.<br><span class="muted">${miss.join("; ")||"full journey"}. ${head?"Use <b>Break my journey</b> to cover the rest.":""}</span></div>`;
+    }else{
+      host.innerHTML=`<div class="drill muted">No confirmed sub-segment on ${cls} for this train — it's waitlisted along the whole route. Try Break my journey.</div>`;
     }
-    out.innerHTML=h+"</div>";
-  }catch(e){out.innerHTML="";setErr("next-seat: "+e.message);}
+  }catch(e){host.innerHTML=`<div class="drill muted">Couldn't check (${e.message}). The free API may be rate-limited — wait a moment and retry.</div>`;}
 }
 
 async function runBreak(){
-  setErr("");const p=q();const out=document.getElementById("out");out.innerHTML="<div class='card muted'>querying…</div>";
+  const p=q();const out=$("#out");
+  if(!p.from||!p.to||!p.date){out.innerHTML=`<div class="card empty">Enter From, To and Date.</div>`;return;}
+  out.innerHTML=`<div class="card spin">Searching two-train options ${p.from} → ${p.to}… (can take ~20s)</div>`;
   try{
-    const d=await api(`/api/break-journey?date=${p.date}&from=${p.from}&to=${p.to}&classes=${p.classes}`);
-    let h=`<div class="card"><h3>Break my journey — ${d.from.name} → ${d.to.name}</h3>`;
-    if(!d.journeys.length)h+=`<div class="muted">${d.note||"no confirmable broken itinerary found"}</div>`;
-    d.journeys.slice(0,4).forEach(j=>{
-      h+=`<div class="card" style="background:#0d1320">
-            <div><b>${j.legs.map(l=>l.train_no).join(" + ")}</b>
-            <span class="tag">${j.breaks} break</span>
-            <span class="tag">wait ${j.total_wait_min} min</span>
-            <span class="tag">arrive ${j.arrive}</span></div>`;
-      j.legs.forEach(l=>{h+=`<div class="leg"><span>${l.train_no} ${l.train_name}</span>
-            <span class="muted">${l.from.name} ${l.dep} → ${l.to.name} ${l.arr}</span>
-            <span>${l.class} ${statusPill({state:'AVAILABLE',text:l.status})}</span></div>`;});
-      h+=`<div class="muted" style="margin-top:6px">break at ${j.transfer.name}, ${j.total_wait_min} min connection</div></div>`;
+    const d=await getJSON(`/api/break-journey?from=${p.from}&to=${p.to}&date=${p.date}&classes=${p.classes}`);
+    let h=`<div class="card"><h2>Break my journey — ${d.from.name} → ${d.to.name}</h2><div class="sub">two trains, confirmed on each leg, at least 1 hour to change</div>`;
+    if(!d.journeys.length){h+=`<div class="empty">${d.note||"No confirmed two-train option found."}</div>`;}
+    d.journeys.slice(0,6).forEach(j=>{
+      h+=`<div class="jrny"><div class="jhead"><b>${j.legs[0].train_no} + ${j.legs[1].train_no}</b><span class="tag">${j.legs[0].class}</span><span class="tag">change ${j.total_wait_min} min</span><span class="tag">arrive ${j.arrive}</span></div>`;
+      j.legs.forEach(l=>{h+=`<div class="leg"><div class="legno">${l.train_no}</div><div class="legb"><div class="legname">${l.train_name}</div><div class="legt">${l.from.name} ${l.dep} → ${l.to.name} ${l.arr} · <b>${l.status}</b></div></div></div>`;});
+      h+=`<div class="brk">⟳ change at ${j.transfer.name} — ${j.total_wait_min} min</div></div>`;
     });
-    out.innerHTML=h+"</div>";
-  }catch(e){out.innerHTML="";setErr("break-journey: "+e.message);}
+    out.innerHTML=h+`</div>`;
+  }catch(e){out.innerHTML=`<div class="card empty">Error: ${e.message}</div>`;}
 }
 </script>
 </body>
