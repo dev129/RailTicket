@@ -101,7 +101,7 @@ class IrctcDevProvider(AvailabilityProvider):
     def _get(self, url: str, params: dict | None = None):
         import requests  # lazy: stdlib-only paths need nothing
         resp = None
-        for attempt in range(3):
+        for attempt in range(2):
             resp = requests.get(url, headers=self._headers(), params=params, timeout=self.timeout)
             if resp.status_code not in (429, 500, 502, 503, 504):
                 return resp
@@ -109,7 +109,7 @@ class IrctcDevProvider(AvailabilityProvider):
                 wait = float(resp.headers.get("Retry-After", ""))
             except ValueError:
                 wait = 0.0
-            wait = min(max(wait, 0.6 * (2 ** attempt)), 8.0)
+            wait = min(max(wait, 0.5 * (2 ** attempt)), 3.0)
             time.sleep(wait)
         return resp
 

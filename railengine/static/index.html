@@ -36,6 +36,14 @@
         border-radius:9px;padding:10px;font:inherit;min-width:0}
   input:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
   .hint{font-size:12px;color:var(--mut);margin-top:4px}
+  .ac{position:relative}
+  .aclist{position:absolute;z-index:30;left:0;right:0;top:100%;margin-top:4px;background:var(--surface);
+        border:1px solid var(--line);border-radius:9px;max-height:244px;overflow:auto;
+        box-shadow:0 10px 26px rgba(0,0,0,.20)}
+  .acitem{padding:9px 11px;cursor:pointer;display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+  .acitem:hover,.acitem.hi{background:var(--accent-weak)}
+  .acitem .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .acitem .cd{color:var(--mut);font-size:12px;font-variant-numeric:tabular-nums;flex:none}
   .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:7px}
   .chip{display:inline-flex;align-items:center;gap:7px;cursor:pointer;background:var(--bg);
         border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13.5px;user-select:none}
@@ -92,23 +100,16 @@
 
   <div class="card">
     <div class="fields">
-      <div><label for="from">From (station code)</label>
-        <input id="from" list="stns" value="NDLS" autocomplete="off"></div>
-      <div><label for="to">To (station code)</label>
-        <input id="to" list="stns" value="MMCT" autocomplete="off"></div>
+      <div class="ac"><label for="from">From</label>
+        <input id="from" autocomplete="off" placeholder="Station name or code">
+        <div class="aclist" id="ac-from" hidden></div></div>
+      <div class="ac"><label for="to">To</label>
+        <input id="to" autocomplete="off" placeholder="Station name or code">
+        <div class="aclist" id="ac-to" hidden></div></div>
       <div class="wide"><label for="date">Date of travel</label>
         <input id="date" type="date"></div>
     </div>
-    <datalist id="stns">
-      <option value="NDLS">New Delhi</option><option value="MMCT">Mumbai Central</option>
-      <option value="BCT">Mumbai Central (BCT)</option><option value="JP">Jaipur</option>
-      <option value="ASV">Asarva</option><option value="UDZ">Udaipur City</option>
-      <option value="AII">Ajmer</option><option value="KOTA">Kota</option>
-      <option value="BRC">Vadodara</option><option value="ST">Surat</option>
-      <option value="HWH">Howrah</option><option value="MAS">Chennai</option>
-      <option value="SBC">Bengaluru</option><option value="PNBE">Patna</option>
-    </datalist>
-    <div class="hint">Tip: use IRCTC station codes (type to search the list). Date must be within the ~60-day booking window.</div>
+    <div class="hint">Type a city or station name (e.g. Jaipur) and pick from the list — or enter an IRCTC code directly. Date must be within the ~60-day booking window.</div>
     <div style="margin-top:14px"><label>Classes</label><div class="chips" id="chips"></div></div>
     <div class="actions">
       <button class="go" onclick="findSeats()">Find seats</button>
@@ -134,6 +135,13 @@ function pillClass(state){return state==="WAITLIST"?"wl":(state==="RAC"?"rac":(s
 
 (function init(){
   $("#date").value="2026-11-29";
+  attachAC("from"); attachAC("to");
+  setStation("from","NDLS","NDLS"); setStation("to","MMCT","MMCT");  // until list loads
+  fetch("/static/stations.json").then(r=>r.json()).then(a=>{
+    STN=a; a.forEach(s=>CODES.add(s.c));
+    const nm=c=>(a.find(s=>s.c===c)||{}).n||c;
+    setStation("from","NDLS",nm("NDLS")); setStation("to","MMCT",nm("MMCT"));
+  }).catch(()=>{});
   const box=$("#chips");
   box.innerHTML=CLASSES.map(([c,l])=>`<label class="chip ${selected.has(c)?'on':''}"><input type="checkbox" value="${c}" ${selected.has(c)?'checked':''}>${c} · ${l}</label>`).join("");
   box.querySelectorAll("input").forEach(cb=>cb.addEventListener("change",()=>{
@@ -146,7 +154,37 @@ function pillClass(state){return state==="WAITLIST"?"wl":(state==="RAC"?"rac":(s
 })();
 
 async function getJSON(u){const r=await fetch(u);const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.detail||("HTTP "+r.status));return d;}
-function q(){return{from:val("from"),to:val("to"),date:$("#date").value,classes:sel().join(",")};}
+
+/* ---- station autocomplete ---- */
+let STN=[]; const CODES=new Set();
+function resolveCode(id){
+  const el=$("#"+id); const raw=(el.value||"").trim();
+  if(el.dataset.code) return el.dataset.code;
+  const up=raw.toUpperCase();
+  if(CODES.has(up)) return up;
+  const byName=STN.find(s=>s.n.toLowerCase()===raw.toLowerCase());
+  return byName?byName.c:up;
+}
+function setStation(id,code,name){const el=$("#"+id);el.value=name;el.dataset.code=code;}
+function attachAC(id){
+  const el=$("#"+id), list=$("#ac-"+id);
+  const render=()=>{
+    const term=(el.value||"").trim().toLowerCase();
+    el.dataset.code="";              // typing invalidates a prior pick
+    if(term.length<1){list.hidden=true;return;}
+    const m=STN.filter(s=>s.n.toLowerCase().includes(term)||s.c.toLowerCase().includes(term)).slice(0,8);
+    if(!m.length){list.hidden=true;return;}
+    list.innerHTML=m.map(s=>`<div class="acitem" data-c="${s.c}" data-n="${s.n.replace(/"/g,'&quot;')}"><span class="nm">${s.n}</span><span class="cd">${s.c}</span></div>`).join("");
+    list.hidden=false;
+  };
+  el.addEventListener("input",render);
+  el.addEventListener("focus",render);
+  el.addEventListener("blur",()=>setTimeout(()=>list.hidden=true,150));
+  list.addEventListener("mousedown",e=>{const it=e.target.closest(".acitem");if(!it)return;
+    setStation(id,it.dataset.c,it.dataset.n);list.hidden=true;});
+}
+
+function q(){return{from:resolveCode("from"),to:resolveCode("to"),date:$("#date").value,classes:sel().join(",")};}
 
 async function findSeats(){
   const p=q();const out=$("#out");
