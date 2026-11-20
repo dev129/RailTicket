@@ -20,9 +20,13 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+import time as _time
+
 from .journey import BrokenJourney, find_broken_journeys
-from .journey_live import find_broken_journeys_live
+from .journey_live import find_broken_journeys_live, _run
 from .models import SegmentOption, SegmentQuery, TravelClass
+
+ALL_CLASSES = [TravelClass.SL, TravelClass.E3, TravelClass.A3, TravelClass.A2, TravelClass.A1]
 from .next_seat import find_next_available
 from .providers.base import AvailabilityProvider
 from .providers.irctcdev import IrctcDevProvider
@@ -182,8 +186,8 @@ def break_journey(
 ) -> dict:
     provider = get_provider()
     o, d = from_.upper(), to.upper()
-    cls = _parse_classes(classes)
     tdate = _parse_date(date)
+    cls = ALL_CLASSES                      # consider every class, not just a selection
 
     if isinstance(provider, MockProvider):
         journeys = find_broken_journeys(provider, tdate, o, d, cls,
@@ -194,10 +198,9 @@ def break_journey(
 
     note = None
     if not journeys and not isinstance(provider, MockProvider):
-        note = ("No confirmed two-train break found. Either every candidate leg was "
-                "waitlisted on this date (common on saturated routes to big cities), or "
-                "the free irctc.dev tier rate-limited this multi-call search — wait a "
-                "minute and try again, pick a less-booked date, or add more classes.")
+        note = ("No fully-confirmed two-train break on this date — across all classes, "
+                "the candidate legs are waitlisted. Check the single-train options under "
+                "“Find seats” (a different class may be open), or try a nearby date.")
     return {"from": _station(o), "to": _station(d),
             "provider": provider_mode(), "note": note,
             "journeys": [_journey_json(j) for j in journeys]}
@@ -222,28 +225,51 @@ def trip(
     date: str = Query(..., description="YYYY-MM-DD"),
     from_: str = Query(..., alias="from"),
     to: str = Query(...),
-    classes: str = Query("3A,2A"),
     max_trains: int = Query(6, ge=1, le=12),
 ) -> dict:
-    """Trains running from->to on a date, each with per-class availability.
-
-    This is the passenger-facing entry point: no train number required.
+    """Trains running from->to on a date, each with availability in EVERY class
+    the train offers (not just a pre-selected one), so a passenger can see where
+    seats actually are. No train number required.
     """
     provider = get_provider()
     o, d = from_.upper(), to.upper()
     tdate = _parse_date(date)
-    cls = _parse_classes(classes)
-
     trains = _route_trains(provider, o, d, tdate, max_trains)
+
+    # Query all 5 classes per train, in parallel under a time budget.
+    deadline = _time.time() + 13.0
+    jobs = []
+    for t in trains:
+        for c in ALL_CLASSES:
+            jobs.append((
+                (t["number"], c.value),
+                (lambda tn=t["number"], cl=c:
+                 provider.get_availability(SegmentQuery(tn, tdate, o, d, cl))),
+            ))
+    st = _run(jobs, 4, deadline)
+
     out = []
     for t in trains:
         per_class = {}
-        for c in cls:
-            st = provider.get_availability(SegmentQuery(t["number"], tdate, o, d, c))
-            per_class[c.value] = {"state": st.state.value, "number": st.number,
-                                  "text": str(st), "confirmable": st.confirmable}
-        out.append({"train_no": t["number"], "name": t["name"],
-                    "dep": t.get("dep"), "arr": t.get("arr"), "classes": per_class})
+        unknown = False
+        for c in ALL_CLASSES:
+            s = st.get((t["number"], c.value))
+            if s is None:                                   # not fetched within budget
+                unknown = True
+                continue
+            if s.state.value in ("NOT_AVAILABLE", "DEPARTED"):
+                # "Invalid Journey Class" = class genuinely not offered -> hide;
+                # anything else (HTTP/rate-limit) = couldn't load -> flag it.
+                if "Invalid" not in (s.raw or ""):
+                    unknown = True
+                continue
+            per_class[c.value] = {"state": s.state.value, "number": s.number,
+                                  "text": str(s), "confirmable": s.confirmable}
+        entry = {"train_no": t["number"], "name": t["name"],
+                 "dep": t.get("dep"), "arr": t.get("arr"), "classes": per_class}
+        if not per_class and unknown:
+            entry["status_note"] = "Availability didn’t load (free-tier rate limit). Tap Find seats again."
+        out.append(entry)
     return {"from": _station(o), "to": _station(d), "date": date,
             "provider": provider_mode(), "trains": out}
 

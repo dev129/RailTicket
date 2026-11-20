@@ -110,7 +110,7 @@
         <input id="date" type="date"></div>
     </div>
     <div class="hint">Type a city or station name (e.g. Jaipur) and pick from the list — or enter an IRCTC code directly. Date must be within the ~60-day booking window.</div>
-    <div style="margin-top:14px"><label>Classes</label><div class="chips" id="chips"></div></div>
+    <div class="hint" style="margin-top:10px">Shows availability in <b>all classes</b> each train offers.</div>
     <div class="actions">
       <button class="go" onclick="findSeats()">Find seats</button>
       <button class="go ghost" onclick="runBreak()">Break my journey</button>
@@ -142,13 +142,6 @@ function pillClass(state){return state==="WAITLIST"?"wl":(state==="RAC"?"rac":(s
     const nm=c=>(a.find(s=>s.c===c)||{}).n||c;
     setStation("from","NDLS",nm("NDLS")); setStation("to","MMCT",nm("MMCT"));
   }).catch(()=>{});
-  const box=$("#chips");
-  box.innerHTML=CLASSES.map(([c,l])=>`<label class="chip ${selected.has(c)?'on':''}"><input type="checkbox" value="${c}" ${selected.has(c)?'checked':''}>${c} · ${l}</label>`).join("");
-  box.querySelectorAll("input").forEach(cb=>cb.addEventListener("change",()=>{
-    cb.checked?selected.add(cb.value):selected.delete(cb.value);
-    if(!selected.size){selected.add(cb.value);cb.checked=true;}
-    cb.closest(".chip").classList.toggle("on",cb.checked);
-  }));
   fetch("/api/health").then(r=>r.json()).then(h=>{$("#modeline").textContent="data source: "+h.provider;})
     .catch(()=>{$("#modeline").textContent="";});
 })();
@@ -184,27 +177,34 @@ function attachAC(id){
     setStation(id,it.dataset.c,it.dataset.n);list.hidden=true;});
 }
 
-function q(){return{from:resolveCode("from"),to:resolveCode("to"),date:$("#date").value,classes:sel().join(",")};}
+function q(){return{from:resolveCode("from"),to:resolveCode("to"),date:$("#date").value};}
 
 async function findSeats(){
   const p=q();const out=$("#out");
   if(!p.from||!p.to||!p.date){out.innerHTML=`<div class="card empty">Enter From, To and Date.</div>`;return;}
   out.innerHTML=`<div class="card spin">Finding trains ${p.from} → ${p.to} on ${p.date}…</div>`;
   try{
-    const d=await getJSON(`/api/trip?from=${p.from}&to=${p.to}&date=${p.date}&classes=${p.classes}`);
+    const d=await getJSON(`/api/trip?from=${p.from}&to=${p.to}&date=${p.date}`);
     if(!d.trains.length){out.innerHTML=`<div class="card empty">No direct trains found for ${d.from.name} → ${d.to.name} on this date. Check the station codes and date.</div>`;return;}
     let h=`<div class="card"><h2>${d.from.name} → ${d.to.name}</h2><div class="sub">${d.date} · ${d.trains.length} train(s) · tap a waitlisted class to find a confirmed seat</div>`;
     d.trains.forEach((t,i)=>{
-      h+=`<div class="train"><div class="trow"><div><span class="tno">${t.train_no}</span> <span class="tname">${t.name}</span></div><div class="ttime">dep ${t.dep||"—"} · arr ${t.arr||"—"}</div></div><div class="pills">`;
-      for(const[c,v]of Object.entries(t.classes)){
-        const pc=pillClass(v.state);
-        if(v.confirmable){
-          h+=`<span class="pill ${pc}"><span class="cls">${c}</span> ${v.text}</span>`;
-        }else{
-          h+=`<span class="pill ${pc}"><span class="cls">${c}</span> ${v.text} · <button class="findbtn" onclick="drill('${t.train_no}','${p.from}','${p.to}','${p.date}','${c}',this)">find seat</button></span>`;
+      h+=`<div class="train"><div class="trow"><div><span class="tno">${t.train_no}</span> <span class="tname">${t.name}</span></div><div class="ttime">dep ${t.dep||"—"} · arr ${t.arr||"—"}</div></div>`;
+      const entries=Object.entries(t.classes);
+      if(entries.length){
+        h+=`<div class="pills">`;
+        for(const[c,v]of entries){
+          const pc=pillClass(v.state);
+          if(v.confirmable){
+            h+=`<span class="pill ${pc}"><span class="cls">${c}</span> ${v.text}</span>`;
+          }else{
+            h+=`<span class="pill ${pc}"><span class="cls">${c}</span> ${v.text} · <button class="findbtn" onclick="drill('${t.train_no}','${p.from}','${p.to}','${p.date}','${c}',this)">find seat</button></span>`;
+          }
         }
+        h+=`</div>`;
+      }else{
+        h+=`<div class="muted" style="margin-top:9px;font-size:13px">${t.status_note||"No reserved classes on this train."}</div>`;
       }
-      h+=`</div><div id="drill-${t.train_no}-${c_safe()}"></div></div>`;
+      h+=`<div id="drill-${t.train_no}-${c_safe()}"></div></div>`;
     });
     out.innerHTML=h+`</div>`;
   }catch(e){out.innerHTML=`<div class="card empty">Error: ${e.message}</div>`;}
@@ -235,7 +235,7 @@ async function runBreak(){
   if(!p.from||!p.to||!p.date){out.innerHTML=`<div class="card empty">Enter From, To and Date.</div>`;return;}
   out.innerHTML=`<div class="card spin">Searching two-train options ${p.from} → ${p.to}… (can take ~20s)</div>`;
   try{
-    const d=await getJSON(`/api/break-journey?from=${p.from}&to=${p.to}&date=${p.date}&classes=${p.classes}`);
+    const d=await getJSON(`/api/break-journey?from=${p.from}&to=${p.to}&date=${p.date}`);
     let h=`<div class="card"><h2>Break my journey — ${d.from.name} → ${d.to.name}</h2><div class="sub">two trains, confirmed on each leg, at least 1 hour to change</div>`;
     if(!d.journeys.length){h+=`<div class="empty">${d.note||"No confirmed two-train option found."}</div>`;}
     d.journeys.slice(0,6).forEach(j=>{

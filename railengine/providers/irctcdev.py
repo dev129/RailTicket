@@ -171,7 +171,11 @@ class IrctcDevProvider(AvailabilityProvider):
         if ckey in self._avail_cache:
             return self._avail_cache[ckey]
         result = self._fetch_availability(query)
-        self._avail_cache[ckey] = result
+        # Cache definitive answers only; never cache a transient HTTP/rate-limit
+        # error, so a retry can fetch it instead of hiding the class forever.
+        transient = result.state is StatusState.NOT_AVAILABLE and result.raw.startswith("HTTP")
+        if not transient:
+            self._avail_cache[ckey] = result
         return result
 
     def _fetch_availability(self, query: SegmentQuery) -> AvailabilityStatus:
